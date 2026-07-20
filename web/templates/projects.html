@@ -1,0 +1,26 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>Projects</h1>
+</div>
+
+<form method="post" action="/projects" class="create-form">
+  <input type="text" name="name" placeholder="New project name" required>
+  <button type="submit">Create project</button>
+</form>
+
+{{if .Data.Projects}}
+<ul class="project-list">
+  {{range .Data.Projects}}
+  <li class="project-item">
+    <a class="project-link" href="/projects/{{.ID}}">
+      <span class="project-name">{{.Name}}</span>
+    </a>
+    <span class="muted project-date">{{.CreatedAt}}</span>
+    <a class="settings-link" href="/projects/{{.ID}}/settings">Settings</a>
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p class="empty">No projects yet. Create one above to get an API key and start receiving logs.</p>
+{{end}}
+{{end}}

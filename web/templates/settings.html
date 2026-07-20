@@ -1,0 +1,73 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>Account Settings</h1>
+</div>
+
+<section class="card">
+  <h2>Change password</h2>
+  <form method="post" action="/settings/password" class="stacked">
+    <label>Current password
+      <input type="password" name="current_password" autocomplete="current-password" required>
+    </label>
+    <label>New password
+      <input type="password" name="new_password" autocomplete="new-password" required>
+    </label>
+    <label>Confirm new password
+      <input type="password" name="confirm_password" autocomplete="new-password" required>
+    </label>
+    <button type="submit">Update password</button>
+  </form>
+</section>
+
+<section class="card" id="invite">
+  <h2>Invite a user</h2>
+  <p class="muted">Generate a one-time link. The link expires in 7 days and is consumed when the invitee sets their password.</p>
+  <form method="post" action="/settings/invite" class="invite-form">
+    <input type="email" name="email" placeholder="Email address" required>
+    <button type="submit">Generate invite</button>
+  </form>
+  {{if .Data.InviteLink}}
+  <script>window.location.hash = '#invite';</script>
+  <div class="invite-link-box">
+    <span class="invite-link-label">One-time invite link</span>
+    <div class="invite-link-row">
+      <input class="invite-link-input" type="text" value="{{.Data.InviteLink}}" readonly onclick="this.select()">
+      <button class="invite-copy-btn secondary" type="button" onclick="navigator.clipboard.writeText('{{.Data.InviteLink}}').then(()=>{this.textContent='Copied!'}).catch(()=>{})">Copy</button>
+    </div>
+  </div>
+  {{end}}
+  {{if .Data.PendingInvites}}
+  <div class="invite-pending">
+    <h3 class="invite-pending-title">Pending invites</h3>
+    <ul class="invite-list">
+      {{range .Data.PendingInvites}}
+      <li class="invite-item">
+        <div class="invite-item-info">
+          <span class="invite-item-email">{{.Email}}</span>
+          <span class="invite-item-expiry muted">Expires {{.ExpiresAt.Format "Jan 2, 2006"}}</span>
+        </div>
+        <form method="post" action="/settings/invite/revoke" class="inline">
+          <input type="hidden" name="token" value="{{.Token}}">
+          <button type="submit" class="secondary invite-revoke-btn">Revoke</button>
+        </form>
+      </li>
+      {{end}}
+    </ul>
+  </div>
+  {{end}}
+</section>
+
+<section class="card">
+  <h2>Theme</h2>
+  <p class="muted">Applies immediately for everyone using this instance.</p>
+  <form method="post" action="/settings/theme" class="theme-form">
+    <label class="radio">
+      <input type="radio" name="theme" value="modern" {{if eq .Data.Theme "modern"}}checked{{end}}> Modern
+    </label>
+    <label class="radio">
+      <input type="radio" name="theme" value="terminal" {{if eq .Data.Theme "terminal"}}checked{{end}}> Terminal
+    </label>
+    <button type="submit">Apply theme</button>
+  </form>
+</section>
+{{end}}

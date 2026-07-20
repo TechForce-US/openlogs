@@ -1,0 +1,19 @@
+# Binaries
+#/openlogs
+#/cmd/openlogs/openlogs
+.idea
+.vscode
+.DS_Store
+
+# Local data & secrets
+/data/
+*.db
+*.db-shm
+*.db-wal
+*.log
+.env
+
+# Custom CSS overrides (operator-provided; not committed)
+/web/static/custom/*.css
+!/web/static/custom/.gitkeep
+/custom/

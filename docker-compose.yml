@@ -1,0 +1,41 @@
+services:
+  openlogs:
+    build: .
+    # Or use a prebuilt image instead of building locally:
+    # image: ghcr.io/jmstewart1127/openlogs:latest
+    restart: unless-stopped
+    environment:
+      OPENLOGS_DB_PATH: /data/openlogs.db
+      # REQUIRED: a long random string used to sign sessions. Set it in a .env
+      # file next to this compose file, or export it in your shell.
+      OPENLOGS_SECRET_KEY: ${OPENLOGS_SECRET_KEY:?set OPENLOGS_SECRET_KEY (e.g. openssl rand -hex 32)}
+      OPENLOGS_PORT: "8080"
+      OPENLOGS_THEME: modern            # modern | terminal
+      OPENLOGS_RETENTION_DAYS: "30"
+      OPENLOGS_CUSTOM_CSS_DIR: /custom  # drop .css files in ./custom to override styles
+      # Optional: auto-create this admin user on startup (idempotent). Set both
+      # (e.g. in your .env) to skip the manual `create-user` step.
+      OPENLOGS_ADMIN_EMAIL: ${OPENLOGS_ADMIN_EMAIL:-}
+      OPENLOGS_ADMIN_PASSWORD: ${OPENLOGS_ADMIN_PASSWORD:-}
+    volumes:
+      - ./data:/data                    # SQLite database persists here
+      - ./custom:/custom                # optional: custom CSS overrides
+    expose:
+      - "8080"                          # internal only; Caddy fronts it
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - openlogs
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data                # certificates & ACME state
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

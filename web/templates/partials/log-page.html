@@ -1,0 +1,1 @@
+{{define "log-page"}}{{range .Logs}}{{template "log-row" .}}{{end}}{{if and .FirstPage (not .Logs)}}<li class="empty">No logs to show.</li>{{end}}{{if .LoadMoreURL}}<li class="load-more"><button type="button" hx-get="{{.LoadMoreURL}}" hx-target="closest .load-more" hx-swap="outerHTML">Load more</button></li>{{end}}{{end}}

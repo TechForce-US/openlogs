@@ -1,0 +1,35 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>{{.Data.Project.Name}}</h1>
+  <a class="settings-link" href="/projects/{{.Data.Project.ID}}/settings">Settings</a>
+</div>
+
+<form class="filters"
+      hx-get="/projects/{{.Data.Project.ID}}"
+      hx-target="#log-list"
+      hx-swap="innerHTML"
+      hx-trigger="change, keyup changed delay:300ms">
+  <input class="filter-search" type="search" name="q" placeholder="Full-text search…" value="{{.Data.Q}}">
+  <input class="filter-channel" type="text" name="channel" placeholder="Channel" value="{{.Data.Channel}}">
+  <div class="filter-dates">
+    <span class="filter-dates-label">Range</span>
+    <input class="filter-date" type="datetime-local" name="from" aria-label="From date/time" value="{{.Data.From}}">
+    <span class="filter-date-sep">→</span>
+    <input class="filter-date" type="datetime-local" name="to" aria-label="To date/time" value="{{.Data.To}}">
+  </div>
+  <div class="levels">
+    {{range .Data.AllLevels}}
+    <label class="level-chip level-{{levelClass .}}">
+      <input type="checkbox" name="level" value="{{.}}" {{if index $.Data.SelectedLevels .}}checked{{end}}>
+      <span>{{.}}</span>
+    </label>
+    {{end}}
+  </div>
+</form>
+
+<div class="log-stream" hx-ext="sse" sse-connect="/projects/{{.Data.Project.ID}}/stream">
+  <ul id="log-list" class="log-list" sse-swap="log" hx-swap="afterbegin">
+    {{template "log-page" .Data.Page}}
+  </ul>
+</div>
+{{end}}

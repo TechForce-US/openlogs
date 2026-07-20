@@ -1,0 +1,15 @@
+# OpenLogs — Caddy reverse proxy.
+#
+# Replace "logs.example.com" with the domain that points at this server. On first
+# start Caddy automatically obtains and renews a TLS certificate from Let's
+# Encrypt, so no manual certificate management is required.
+#
+# For local testing without a public domain, you can use ":80" or "localhost"
+# instead of a hostname (Caddy will serve over HTTP or a local self-signed cert).
+
+logs.example.com {
+	# Forward all requests to the openlogs container on the internal Docker
+	# network. Caddy adds X-Forwarded-Proto so OpenLogs marks session cookies
+	# Secure, and it streams the SSE endpoint without buffering.
+	reverse_proxy openlogs:8080
+}

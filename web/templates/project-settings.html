@@ -1,0 +1,33 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>{{.Data.Project.Name}} · Settings</h1>
+  <a class="settings-link" href="/projects/{{.Data.Project.ID}}">← Back to logs</a>
+</div>
+
+<section class="card">
+  <h2>API Key</h2>
+  <p class="muted">Send logs to <code>POST /api/ingest</code> with this key in the <code>X-API-Key</code> header.</p>
+  <code class="apikey">{{.Data.Project.APIKey}}</code>
+  <form method="post" action="/projects/{{.Data.Project.ID}}/regenerate-key"
+        onsubmit="return confirm('Regenerate the API key? The old key stops working immediately.')">
+    <button type="submit" class="secondary">Regenerate key</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Rename project</h2>
+  <form method="post" action="/projects/{{.Data.Project.ID}}/settings" class="inline-form">
+    <input type="text" name="name" value="{{.Data.Project.Name}}" required>
+    <button type="submit">Save</button>
+  </form>
+</section>
+
+<section class="card danger">
+  <h2>Delete project</h2>
+  <p class="muted">Permanently deletes this project and every log it contains.</p>
+  <form method="post" action="/projects/{{.Data.Project.ID}}/delete"
+        onsubmit="return confirm('Delete this project and ALL its logs? This cannot be undone.')">
+    <button type="submit" class="danger-btn">Delete project</button>
+  </form>
+</section>
+{{end}}

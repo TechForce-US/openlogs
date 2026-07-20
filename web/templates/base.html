@@ -1,0 +1,31 @@
+{{define "base"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenLogs</title>
+  <link rel="stylesheet" href="/static/{{.Theme}}.css">
+  {{range .CustomCSS}}<link rel="stylesheet" href="/static/custom/{{.}}">
+  {{end}}<script src="/static/htmx.min.js" defer></script>
+  <script src="/static/htmx-ext-sse.js" defer></script>
+</head>
+<body>
+  {{if .User}}
+  <header class="topbar">
+    <a class="brand" href="/projects">◆ OpenLogs</a>
+    <nav class="topnav">
+      <a href="/projects">Projects</a>
+      <a href="/settings">Settings</a>
+      <form method="post" action="/logout" class="inline">
+        <button type="submit" class="linklike">Log out</button>
+      </form>
+    </nav>
+  </header>
+  {{end}}
+  <main class="container">
+    {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+    {{block "content" .}}{{end}}
+  </main>
+</body>
+</html>
+{{end}}

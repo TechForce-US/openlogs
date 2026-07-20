@@ -1,0 +1,36 @@
+# Local-only Docker Compose for running OpenLogs on your machine.
+#
+# No Caddy / no TLS — OpenLogs is exposed directly on http://localhost:8080.
+# For production (automatic HTTPS via Caddy) use the main docker-compose.yml.
+#
+# Usage:
+#   docker compose -f docker-compose.local.yml up --build -d
+#   docker compose -f docker-compose.local.yml exec openlogs openlogs create-user you@example.com
+#   open http://localhost:8080
+#
+# The SQLite database persists in ./data. Override any setting by exporting the
+# matching variable (or putting it in a .env file) before running compose.
+
+services:
+  openlogs:
+    build: .
+    container_name: openlogs-local
+    restart: unless-stopped
+    environment:
+      OPENLOGS_DB_PATH: /data/openlogs.db
+      # A default is provided so it "just works" locally. Do NOT use this value
+      # in production — set OPENLOGS_SECRET_KEY to a real random string there.
+      OPENLOGS_SECRET_KEY: ${OPENLOGS_SECRET_KEY:-local-dev-secret-change-me}
+      OPENLOGS_PORT: "8080"
+      OPENLOGS_THEME: ${OPENLOGS_THEME:-modern}          # modern | terminal
+      OPENLOGS_RETENTION_DAYS: ${OPENLOGS_RETENTION_DAYS:-30}
+      OPENLOGS_CUSTOM_CSS_DIR: /custom                    # drop .css files in ./custom to override styles
+      # Optional: auto-create this admin user on startup (idempotent). Uncomment
+      # both to skip the manual `create-user` step. Password must be >= 8 chars.
+      #OPENLOGS_ADMIN_EMAIL: admin@example.com
+      #OPENLOGS_ADMIN_PASSWORD: change-me-please
+    volumes:
+      - ./data:/data
+      - ./custom:/custom                                 # optional: custom CSS overrides
+    ports:
+      - "8080:8080"

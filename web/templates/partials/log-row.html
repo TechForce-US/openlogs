@@ -1,0 +1,1 @@
+{{define "log-row"}}<li class="log-row level-{{levelClass .Level}}"><details><summary class="log-summary"><span class="log-level">{{.Level}}</span><span class="log-time">{{.LoggedAt}}</span>{{if .Channel}}<span class="log-channel">{{.Channel}}</span>{{end}}<span class="log-message">{{.Message}}</span></summary>{{template "log-detail" .}}</details></li>{{end}}
