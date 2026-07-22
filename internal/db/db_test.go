@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -444,6 +445,68 @@ func TestInviteListPending(t *testing.T) {
 	}
 	if len(pending) != 2 {
 		t.Fatalf("want 2 pending, got %d", len(pending))
+	}
+}
+
+func TestInsertLogs(t *testing.T) {
+	d := newTestDB(t)
+	p := mustProject(t, d, "app")
+
+	const n = 5
+	input := make([]*Log, n)
+	for i := range n {
+		input[i] = &Log{
+			ProjectID: p.ID,
+			Level:     "INFO",
+			LevelNum:  200,
+			Channel:   "web",
+			Message:   fmt.Sprintf("msg %d", i),
+			Context:   "{}",
+			Extra:     "{}",
+			LoggedAt:  fmt.Sprintf("2026-01-01 00:00:%02d", i),
+		}
+	}
+
+	stored, err := d.InsertLogs(input)
+	if err != nil {
+		t.Fatalf("InsertLogs: %v", err)
+	}
+	if len(stored) != n {
+		t.Fatalf("want %d returned, got %d", n, len(stored))
+	}
+
+	// All IDs must be positive, unique, and sequential.
+	seen := map[int64]bool{}
+	firstID := stored[0].ID
+	for i, l := range stored {
+		if l.ID <= 0 {
+			t.Errorf("non-positive ID at %d: %d", i, l.ID)
+		}
+		if seen[l.ID] {
+			t.Errorf("duplicate ID: %d", l.ID)
+		}
+		seen[l.ID] = true
+		if l.ID != firstID+int64(i) {
+			t.Errorf("non-sequential ID at %d: want %d, got %d", i, firstID+int64(i), l.ID)
+		}
+	}
+
+	// All entries must be persisted with correct content.
+	logs, err := d.QueryLogs(LogFilter{ProjectID: p.ID})
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if len(logs) != n {
+		t.Fatalf("want %d in DB, got %d", n, len(logs))
+	}
+	msgSet := map[string]bool{}
+	for _, l := range logs {
+		msgSet[l.Message] = true
+	}
+	for i := range n {
+		if !msgSet[fmt.Sprintf("msg %d", i)] {
+			t.Errorf("'msg %d' not found in DB", i)
+		}
 	}
 }
 

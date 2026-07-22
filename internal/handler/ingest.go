@@ -13,6 +13,12 @@ import (
 // maxIngestBody caps the accepted request body size to guard against oversized payloads.
 const maxIngestBody = 1 << 20 // 1 MiB
 
+// maxBatchBody and maxBatchEntries cap the batch ingest endpoint.
+const (
+	maxBatchBody    = 10 << 20 // 10 MiB
+	maxBatchEntries = 1000
+)
+
 // ingestPayload mirrors the language-agnostic wire format, compatible with
 // Monolog's JsonFormatter output.
 type ingestPayload struct {
@@ -105,6 +111,83 @@ func (a *App) Ingest(w http.ResponseWriter, r *http.Request) {
 
 	a.Broker.Publish(project.ID, *stored)
 	w.WriteHeader(http.StatusCreated)
+}
+
+// IngestBatch accepts a JSON array of log entries, validates all entries, then
+// inserts them in a single transaction and broadcasts each to live subscribers.
+func (a *App) IngestBatch(w http.ResponseWriter, r *http.Request) {
+	project := currentProject(r)
+	if project == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxBatchBody)
+	var payloads []ingestPayload
+	if err := json.NewDecoder(r.Body).Decode(&payloads); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	if len(payloads) == 0 {
+		http.Error(w, "batch must not be empty", http.StatusBadRequest)
+		return
+	}
+	if len(payloads) > maxBatchEntries {
+		http.Error(w, "batch exceeds maximum of 1000 entries", http.StatusBadRequest)
+		return
+	}
+
+	// Validate and normalize all entries before any writes (all-or-nothing).
+	entries := make([]*db.Log, len(payloads))
+	for i, p := range payloads {
+		if strings.TrimSpace(p.Message) == "" || strings.TrimSpace(p.LevelName) == "" {
+			http.Error(w, "message and level_name are required", http.StatusBadRequest)
+			return
+		}
+		if strings.TrimSpace(p.Datetime) == "" {
+			http.Error(w, "datetime is required", http.StatusBadRequest)
+			return
+		}
+		loggedAt, err := parseDatetime(p.Datetime)
+		if err != nil {
+			http.Error(w, "datetime is not a recognised timestamp", http.StatusBadRequest)
+			return
+		}
+
+		level := strings.ToUpper(strings.TrimSpace(p.LevelName))
+		levelNum := 0
+		if p.Level != nil {
+			levelNum = *p.Level
+		} else if n, ok := monologLevels[level]; ok {
+			levelNum = n
+		}
+
+		entries[i] = &db.Log{
+			ProjectID: project.ID,
+			Channel:   p.Channel,
+			Level:     level,
+			LevelNum:  levelNum,
+			Message:   p.Message,
+			Context:   jsonOrDefault(p.Context),
+			Extra:     jsonOrDefault(p.Extra),
+			LoggedAt:  loggedAt.UTC().Format("2006-01-02 15:04:05"),
+		}
+	}
+
+	stored, err := a.DB.InsertLogs(entries)
+	if err != nil {
+		log.Printf("ingest batch: insert failed: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	for _, l := range stored {
+		a.Broker.Publish(project.ID, *l)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]int{"accepted": len(stored)})
 }
 
 // parseDatetime tries each supported layout and returns the parsed time.

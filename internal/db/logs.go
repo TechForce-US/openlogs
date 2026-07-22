@@ -63,6 +63,52 @@ func (d *DB) InsertLog(l *Log) (*Log, error) {
 	return l, nil
 }
 
+// InsertLogs stores a slice of log entries in a single multi-row INSERT inside
+// an explicit transaction and returns the slice with IDs populated.
+// SQLite guarantees contiguous autoincrement IDs within a single INSERT, so
+// we recover all IDs from LastInsertId via lastID - N + 1 + i.
+func (d *DB) InsertLogs(logs []*Log) ([]*Log, error) {
+	if len(logs) == 0 {
+		return logs, nil
+	}
+
+	// Build INSERT ... VALUES (?,?,?,?,?,?,?,?),(?,?,?,?,?,?,?,?), ...
+	const cols = 8
+	rowPlaceholder := "(?,?,?,?,?,?,?,?)"
+	placeholders := make([]string, len(logs))
+	args := make([]any, 0, len(logs)*cols)
+	for i, l := range logs {
+		placeholders[i] = rowPlaceholder
+		args = append(args, l.ProjectID, l.Channel, l.Level, l.LevelNum, l.Message, l.Context, l.Extra, l.LoggedAt)
+	}
+
+	query := `INSERT INTO logs (project_id, channel, level, level_num, message, context, extra, logged_at) VALUES ` +
+		strings.Join(placeholders, ",")
+
+	tx, err := d.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("insert logs: begin: %w", err)
+	}
+	res, err := tx.Exec(query, args...)
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, fmt.Errorf("insert logs: exec: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("insert logs: commit: %w", err)
+	}
+
+	lastID, err := res.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("insert logs: last id: %w", err)
+	}
+	n := int64(len(logs))
+	for i, l := range logs {
+		l.ID = lastID - n + 1 + int64(i)
+	}
+	return logs, nil
+}
+
 // QueryLogs returns up to the filter's limit of logs matching the filter, newest
 // first.
 func (d *DB) QueryLogs(f LogFilter) ([]Log, error) {

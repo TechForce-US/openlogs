@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"encoding/json"
+	"fmt"
 	"html"
 	"io"
 	"net/http"
@@ -556,4 +558,93 @@ func hasSessionCookie(c *http.Client, base string) bool {
 		}
 	}
 	return false
+}
+
+func TestIngestBatchFlow(t *testing.T) {
+	srv, database := newTestServer(t, "modern")
+	project, _ := database.CreateProject("batchapp")
+
+	validEntry := func(msg string) string {
+		return fmt.Sprintf(`{"message":%q,"level_name":"INFO","channel":"web","datetime":"2026-01-01T00:00:00Z"}`, msg)
+	}
+
+	postBatch := func(key, body string) *http.Response {
+		t.Helper()
+		req, _ := http.NewRequest("POST", srv.URL+"/api/ingest/batch", strings.NewReader(body))
+		if key != "" {
+			req.Header.Set("X-API-Key", key)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("do request: %v", err)
+		}
+		return resp
+	}
+
+	// Invalid API key → 401.
+	r := postBatch("bad-key", "["+validEntry("test")+"]")
+	if r.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("bad key: want 401, got %d", r.StatusCode)
+	}
+	r.Body.Close()
+
+	// Missing API key → 401.
+	r = postBatch("", "["+validEntry("test")+"]")
+	if r.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("no key: want 401, got %d", r.StatusCode)
+	}
+	r.Body.Close()
+
+	// Empty array → 400.
+	r = postBatch(project.APIKey, `[]`)
+	if r.StatusCode != http.StatusBadRequest {
+		t.Fatalf("empty: want 400, got %d", r.StatusCode)
+	}
+	r.Body.Close()
+
+	// Missing required field (level_name) → 400, nothing stored.
+	r = postBatch(project.APIKey, `[{"message":"x","datetime":"2026-01-01T00:00:00Z"}]`)
+	if r.StatusCode != http.StatusBadRequest {
+		t.Fatalf("missing field: want 400, got %d", r.StatusCode)
+	}
+	r.Body.Close()
+	logs, _ := database.QueryLogs(db.LogFilter{ProjectID: project.ID})
+	if len(logs) != 0 {
+		t.Fatalf("missing field: want 0 stored, got %d", len(logs))
+	}
+
+	// Array over 1000 entries → 400, nothing stored.
+	entries := make([]string, 1001)
+	for i := range entries {
+		entries[i] = validEntry(fmt.Sprintf("msg %d", i))
+	}
+	r = postBatch(project.APIKey, "["+strings.Join(entries, ",")+"]")
+	if r.StatusCode != http.StatusBadRequest {
+		t.Fatalf("over limit: want 400, got %d", r.StatusCode)
+	}
+	r.Body.Close()
+	logs, _ = database.QueryLogs(db.LogFilter{ProjectID: project.ID})
+	if len(logs) != 0 {
+		t.Fatalf("over limit: want 0 stored, got %d", len(logs))
+	}
+
+	// Valid batch → 201 with correct accepted count and all entries stored.
+	batch := "[" + validEntry("alpha") + "," + validEntry("beta") + "," + validEntry("gamma") + "]"
+	r = postBatch(project.APIKey, batch)
+	if r.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(r.Body)
+		r.Body.Close()
+		t.Fatalf("valid: want 201, got %d: %s", r.StatusCode, b)
+	}
+	var result map[string]int
+	json.NewDecoder(r.Body).Decode(&result)
+	r.Body.Close()
+	if result["accepted"] != 3 {
+		t.Fatalf("accepted: want 3, got %d", result["accepted"])
+	}
+	logs, _ = database.QueryLogs(db.LogFilter{ProjectID: project.ID})
+	if len(logs) != 3 {
+		t.Fatalf("stored: want 3, got %d", len(logs))
+	}
 }

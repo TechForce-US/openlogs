@@ -39,6 +39,7 @@ func (a *App) Router() (http.Handler, error) {
 
 	// Ingest API (API-key authenticated).
 	mux.Handle("POST /api/ingest", apiKeyMW(http.HandlerFunc(a.Ingest)))
+	mux.Handle("POST /api/ingest/batch", apiKeyMW(http.HandlerFunc(a.IngestBatch)))
 
 	// Protected web routes.
 	mux.Handle("GET /{$}", protect(func(w http.ResponseWriter, r *http.Request) {
