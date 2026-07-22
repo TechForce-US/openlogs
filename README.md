@@ -17,6 +17,28 @@ with no runtime dependencies.
 
 ---
 
+## TL;DR
+
+Point your domain's DNS at the server, then:
+
+```sh
+# 1. Configure your domain and generate a secret key
+echo "OPENLOGS_URL=logs.example.com" > .env
+echo "OPENLOGS_SECRET_KEY=$(openssl rand -hex 32)" >> .env
+
+# 2. Start (Caddy handles TLS automatically)
+docker compose up -d
+
+# 3. Create a user
+docker compose exec openlogs openlogs create-user you@example.com
+
+# 4. Open https://logs.example.com and log in
+```
+
+For local development without TLS, see [Run locally](#run-locally-docker-compose-no-tls) below.
+
+---
+
 ## Quickstart (Docker Compose + Caddy)
 
 Caddy handles TLS automatically for a public domain.
@@ -31,13 +53,13 @@ Caddy handles TLS automatically for a public domain.
 
    Replace `logs.example.com` with your actual domain. No need to edit `Caddyfile`.
 
-4. Start the stack:
+3. Start the stack:
 
    ```sh
    docker compose up -d
    ```
 
-5. Create your first user (interactive password prompt):
+4. Create your first user (interactive password prompt):
 
    ```sh
    docker compose exec openlogs openlogs create-user you@example.com
@@ -47,7 +69,7 @@ Caddy handles TLS automatically for a public domain.
    [Configuration](#configuration)) to have the admin created automatically on
    startup, skipping this step.
 
-6. Open `https://your-domain` and log in.
+5. Open `https://your-domain` and log in.
 
 The SQLite database lives in `./data/openlogs.db` — back up that directory. To
 keep logs beyond the retention window, copy/rotate the `.db` file before pruning.
@@ -224,95 +246,15 @@ the key is shown on the project's settings page.
 
 ---
 
-## Laravel / Monolog adapter (reference)
-
-OpenLogs' ingest format is exactly Monolog's `JsonFormatter` output, so a thin
-custom handler is all you need. (A dedicated Composer package may come later.)
-
-Create the handler:
-
-```php
-<?php
-
-namespace App\Logging;
-
-use Monolog\Handler\AbstractProcessingHandler;
-use Monolog\Formatter\JsonFormatter;
-use Monolog\LogRecord;
-
-class OpenLogsHandler extends AbstractProcessingHandler
-{
-    public function __construct(
-        private string $endpoint,
-        private string $apiKey,
-        $level = \Monolog\Level::Debug,
-        bool $bubble = true,
-    ) {
-        parent::__construct($level, $bubble);
-    }
-
-    protected function getDefaultFormatter(): \Monolog\Formatter\FormatterInterface
-    {
-        return new JsonFormatter();
-    }
-
-    protected function write(LogRecord $record): void
-    {
-        $ch = curl_init($this->endpoint);
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $record->formatted,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 3,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'X-API-Key: ' . $this->apiKey,
-            ],
-        ]);
-        curl_exec($ch);
-        curl_close($ch);
-    }
-}
-```
-
-Wire it up as a custom channel in `config/logging.php`:
-
-```php
-'channels' => [
-    'openlogs' => [
-        'driver' => 'monolog',
-        'handler' => App\Logging\OpenLogsHandler::class,
-        'handler_with' => [
-            'endpoint' => env('OPENLOGS_ENDPOINT', 'https://your-domain/api/ingest'),
-            'apiKey'   => env('OPENLOGS_API_KEY'),
-        ],
-    ],
-
-    // Optionally send to OpenLogs and the local file at once:
-    'stack' => [
-        'driver'   => 'stack',
-        'channels' => ['single', 'openlogs'],
-    ],
-],
-```
-
-Then set `LOG_CHANNEL=openlogs` (or `stack`) and add `OPENLOGS_ENDPOINT` /
-`OPENLOGS_API_KEY` to your `.env`.
-
-> For production, consider queueing or buffering log delivery so a slow OpenLogs
-> instance never blocks a request. Monolog's `BufferHandler` around
-> `OpenLogsHandler` is an easy start.
-
----
-
 ## Development
 
 ```sh
-go build ./...      # compile
-go vet ./...        # static checks
-go test ./...       # run all tests
-go run ./cmd/openlogs create-user you@example.com
-OPENLOGS_SECRET_KEY=dev go run ./cmd/openlogs serve
+make serve          # start the server (uses OPENLOGS_SECRET_KEY=dev if unset)
+make build          # compile to ./openlogs
+make test           # run all tests
+
+go run ./cmd/openlogs create-user you@example.com  # create a user against the local DB
+go vet ./...        # static analysis
 ```
 
 ### Seeding with real log data (`importlogs`)
