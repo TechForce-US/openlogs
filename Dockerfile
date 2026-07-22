@@ -14,15 +14,17 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /openlogs ./cmd/openlo
 
 # ---- runtime stage ----
 FROM alpine:3.20
-RUN adduser -D -u 10001 openlogs \
+RUN apk add --no-cache su-exec \
+    && adduser -D -u 10001 openlogs \
     && mkdir -p /data \
     && chown openlogs:openlogs /data
 COPY --from=build /openlogs /usr/local/bin/openlogs
-USER openlogs
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Run from /data so the default relative DB path resolves to a writable, persisted
 # location even when run without an explicit OPENLOGS_DB_PATH.
 WORKDIR /data
 VOLUME /data
 EXPOSE 8080
-ENTRYPOINT ["openlogs"]
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["serve"]

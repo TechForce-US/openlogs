@@ -22,6 +22,10 @@ services:
       - ./custom:/custom                # optional: custom CSS overrides
     expose:
       - "8080"                          # internal only; Caddy fronts it
+    # Uncomment to expose to a local reverse proxy (nginx, Traefik, etc.).
+    # Set HOST_PORT in .env to avoid conflicts with other services.
+    # ports:
+    #   - "127.0.0.1:${HOST_PORT:-8080}:8080"
 
   caddy:
     image: caddy:2
