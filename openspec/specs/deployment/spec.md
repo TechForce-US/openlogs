@@ -19,6 +19,7 @@ All runtime configuration SHALL be expressible via environment variables. The `d
 
 | Variable | Default | Description |
 |---|---|---|
+| `OPENLOGS_URL` | `logs.example.com` | Public hostname Caddy serves; set in `.env`, never edit `Caddyfile` directly |
 | `OPENLOGS_DB_PATH` | `/data/openlogs.db` | Path to the SQLite database file |
 | `OPENLOGS_SECRET_KEY` | *(required)* | Secret used for session signing; server exits if unset |
 | `OPENLOGS_PORT` | `8080` | Port the HTTP server listens on |
@@ -33,6 +34,10 @@ All runtime configuration SHALL be expressible via environment variables. The `d
 - **WHEN** `OPENLOGS_THEME=terminal` is set and the server restarts
 - **THEN** the terminal CSS theme is served to all clients
 
+#### Scenario: URL configured via env var
+- **WHEN** an operator adds `OPENLOGS_URL=my-domain.com` to their `.env`
+- **THEN** Caddy serves OpenLogs at `my-domain.com` without any edits to `Caddyfile`
+
 ### Requirement: Manual reverse proxy documentation
 The repository README SHALL document how to run OpenLogs behind a manual reverse proxy (nginx, Apache, Traefik, etc.) without Docker Compose. The documentation SHALL cover: running the binary directly, pointing the reverse proxy at `localhost:8080`, and setting required environment variables.
 
@@ -41,9 +46,13 @@ The repository README SHALL document how to run OpenLogs behind a manual reverse
 - **THEN** they can follow the manual setup instructions to deploy OpenLogs without Docker
 
 ### Requirement: Caddyfile template
-The repository SHALL include a `Caddyfile` with a placeholder domain that users replace with their own. The Caddyfile SHALL configure Caddy to reverse-proxy to the `openlogs` container using the Docker internal hostname.
+The repository SHALL include a `Caddyfile` that reads the public hostname from the `OPENLOGS_URL` environment variable using Caddy's native `{env.OPENLOGS_URL}` substitution. The Caddyfile SHALL configure Caddy to reverse-proxy to the `openlogs` container using the Docker internal hostname. Operators SHALL set `OPENLOGS_URL` in their `.env` file; they SHALL NOT need to edit the checked-in `Caddyfile`.
+
+#### Scenario: Domain is configurable without editing the Caddyfile
+- **WHEN** an operator sets `OPENLOGS_URL=logs.example.com` in their `.env` file
+- **THEN** Caddy uses that domain as its hostname without any changes to the tracked `Caddyfile`
 
 #### Scenario: Caddyfile is self-documenting
 - **WHEN** a user opens the Caddyfile
-- **THEN** the domain placeholder and proxy target are clearly identified with inline comments
+- **THEN** the env var placeholder and proxy target are clearly identified with inline comments
 

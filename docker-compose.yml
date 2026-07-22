@@ -31,6 +31,9 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      # Set your public domain in .env — do not edit the Caddyfile directly.
+      OPENLOGS_URL: ${OPENLOGS_URL:-logs.example.com}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data                # certificates & ACME state

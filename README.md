@@ -22,12 +22,14 @@ with no runtime dependencies.
 Caddy handles TLS automatically for a public domain.
 
 1. Point your domain's DNS at the server.
-2. Edit `Caddyfile` and replace `logs.example.com` with your domain.
-3. Create a `.env` file with a session secret:
+2. Create a `.env` file with your domain and a session secret:
 
    ```sh
-   echo "OPENLOGS_SECRET_KEY=$(openssl rand -hex 32)" > .env
+   echo "OPENLOGS_URL=logs.example.com" > .env
+   echo "OPENLOGS_SECRET_KEY=$(openssl rand -hex 32)" >> .env
    ```
+
+   Replace `logs.example.com` with your actual domain. No need to edit `Caddyfile`.
 
 4. Start the stack:
 
